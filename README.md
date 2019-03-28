@@ -1,6 +1,7 @@
 # Checkiday
 
 [![Godoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/retgits/checkiday)
+[![GoCenter](https://img.shields.io/badge/GoCenter-available-brightgreen.svg?style=flat-square)](https://gocenter.jfrog.com/github.com~2Fretgits~2Fcheckiday/versions)
 
 [Checkiday.com](https://www.checkiday.com/) is the world's most complete holiday listing website. There are at least 4300 unique holidays on the site that checkiday has verified for authenticity. This Go package, not endorsed by checkiday.com, serves as a simple wrapper on their API so that you can use their awesome data in your awesome app.
 
