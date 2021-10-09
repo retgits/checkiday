@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -26,9 +27,7 @@ type Holiday struct {
 	URL  string `json:"url"`
 }
 
-const (
-	checkidayURL = "https://www.checkiday.com/api/3/?d=%s"
-)
+var checkidayURL = "https://www.checkiday.com/api/3/"
 
 // Today calls the checkiday.com API and returns all the holidays that are today
 // (based on the locale of the machine) or an error.
@@ -40,8 +39,15 @@ func Today() (Checkiday, error) {
 // date or an error. The date must be in form of mm/dd/yyyy.
 func On(date string) (Checkiday, error) {
 	days := Checkiday{}
+	u, err := url.Parse(checkidayURL)
+	if err != nil {
+		return days, err
+	}
+	q := u.Query()
+	q.Set("d", date)
+	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequest("GET", fmt.Sprintf(checkidayURL, date), nil)
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return days, fmt.Errorf("error creating HTTP request %s", err.Error())
 	}

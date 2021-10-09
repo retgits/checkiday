@@ -4,33 +4,130 @@
 package checkiday
 
 import (
+	"bytes"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOn(t *testing.T) {
-	Checkiday, err := On("27/03/2019")
-	assert.Error(t, err)
-	assert.EqualError(t, err, "checkiday error Could not parse date.")
+var (
+	mux    *http.ServeMux
+	server *httptest.Server
+)
 
-	Checkiday, err = On("03/27/2019")
-	assert.NoError(t, err)
-	assert.Equal(t, Checkiday.Date, "03/27/2019")
-	assert.Equal(t, len(Checkiday.Holidays), 8)
-	assert.Equal(t, Checkiday.Error, "none")
+func setup() {
+	mux = http.NewServeMux()
+	server = httptest.NewServer(mux)
+}
+
+func teardown() {
+	server.Close()
+}
+
+func fixture(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	return ioutil.ReadAll(f)
+}
+
+func TestOn(t *testing.T) {
+
+	t.Run("check invalid date format", func(t *testing.T) {
+		setup()
+		defer teardown()
+
+		checkidayURL = server.URL
+
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("content-type", "application/json; charset=UTF-8")
+			w.WriteHeader(http.StatusOK)
+			f, err := fixture(filepath.Join("testdata", "bad-date-error.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = w.Write(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+
+		_, err := On("27/03/2019")
+
+		assert.Error(t, err)
+		assert.EqualError(t, err, "checkiday error Could not parse date.")
+	})
+
+	t.Run("check valid date format", func(t *testing.T) {
+		setup()
+		defer teardown()
+
+		checkidayURL = server.URL
+
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("content-type", "application/json; charset=UTF-8")
+			w.WriteHeader(http.StatusOK)
+			f, err := fixture(filepath.Join("testdata", "good-response.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = w.Write(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+
+		cd, err := On("03/27/2019")
+		assert.NoError(t, err)
+		assert.Equal(t, "03/27/2019", cd.Date)
+		assert.Equal(t, 9, len(cd.Holidays))
+		assert.Equal(t, "none", cd.Error)
+	})
 }
 
 func TestToday(t *testing.T) {
+
 	today := time.Now().Local().Format("01/02/2006")
-	CheckidayOn, err := On(today)
-	assert.NoError(t, err)
 
-	CheckidayToday, err := Today()
-	assert.NoError(t, err)
+	t.Run("check valid date format", func(t *testing.T) {
+		setup()
+		defer teardown()
 
-	assert.Equal(t, CheckidayToday.Date, today)
-	assert.Equal(t, CheckidayOn.Number, CheckidayToday.Number)
-	assert.Equal(t, CheckidayToday.Error, "none")
+		checkidayURL = server.URL
+
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("content-type", "application/json; charset=UTF-8")
+			w.WriteHeader(http.StatusOK)
+			f, err := fixture(filepath.Join("testdata", "good-response.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			f = bytes.ReplaceAll(f, []byte("03/27/2019"), []byte(today))
+			_, err = w.Write(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+
+		cd, err := Today()
+		assert.NoError(t, err)
+		assert.Equal(t, today, cd.Date)
+		assert.Equal(t, int64(9), cd.Number)
+		assert.Equal(t, "none", cd.Error)
+	})
+
 }
